@@ -8,7 +8,7 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --lora_alpha 256 \
     --mm_projector_lr 2e-5 \
     --bits 4 \
-    --model_name_or_path ~/llava/llava-v1.5-7b \
+    --model_name_or_path ~/LLaVA/llava-v1.5-7b \
     --version llava_llama_2 \
     --data_path ~/LLaVA/armbench/train/dataset.json \
     --validation_data_path ~/LLaVA/armbench/validation/dataset.json \
@@ -22,13 +22,12 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --group_by_modality_length True \
     --bf16 True \
     --output_dir ~/LLaVA/llava/checkpoints/llama-2-7b-chat-task-qlora \
-    --num_train_epochs 500 \
+    --num_train_epochs 20 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "epoch" \
-    --save_strategy "steps" \
-    --save_steps 50000 \
+    --save_strategy "epoch" \
     --save_total_limit 1 \
     --learning_rate 2e-4 \
     --weight_decay 0. \

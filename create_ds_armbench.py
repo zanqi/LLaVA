@@ -136,7 +136,8 @@ def main(arguments):
     output_dir = args.output_dir
     train_size = args.train_size
     val_size = args.val_size
-    save_dataset("armbench", 10, 5, 5)
+    test_size = args.test_size
+    save_dataset(output_dir, train_size, val_size, test_size)
 
 
 if __name__ == "__main__":

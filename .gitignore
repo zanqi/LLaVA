@@ -37,3 +37,4 @@ serve_images/
 # Fine-tuning
 dataset/
 armbench/
+armbench512x384_5_all.h5
