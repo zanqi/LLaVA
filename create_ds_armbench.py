@@ -19,18 +19,12 @@ def save_dataset(output_dir, train_size, val_size, test_size):
         img = f["data"]
         mask = f["mask"]
 
-        # TODO: Select images with at least one object
+        # get train_size number of images for training with single object
+        i = 0
+        train_img, train_mask, i = get_split(train_size, img, mask, i)
 
-        train_img = np.array(img[:train_size])
-        val_img = np.array(img[train_size : train_size + val_size])
-        test_img = np.array(
-            img[train_size + val_size : train_size + val_size + test_size]
-        )
-        train_mask = np.array(mask[:train_size])
-        val_mask = np.array(mask[train_size : train_size + val_size])
-        test_mask = np.array(
-            mask[train_size + val_size : train_size + val_size + test_size]
-        )
+        val_img, val_mask, i = get_split(val_size, img, mask, i)
+        test_img, test_mask, i = get_split(test_size, img, mask, i)
 
         img_dir = f"{output_dir}/images"
         if not os.path.exists(img_dir):
@@ -48,6 +42,21 @@ def save_dataset(output_dir, train_size, val_size, test_size):
         prep_and_save(train_img, train_mask, train_dir, img_dir)
         prep_and_save(val_img, val_mask, val_dir, img_dir)
         prep_and_save(test_img, test_mask, test_dir, img_dir)
+
+def get_split(train_size, img, mask, i):
+    img_split = []
+    mask_split = []
+    for _ in range(train_size):
+        while True:
+            if len(np.unique(mask[i])) == 3:
+                img_split.append(img[i])
+                mask_split.append(mask[i])
+                i += 1
+                break
+            i += 1
+    img_split = np.array(img_split)
+    mask_split = np.array(mask_split)
+    return img_split, mask_split, i
 
 
 def prep_and_save(img, mask, json_dir, img_dir):
@@ -69,7 +78,6 @@ def prep_and_save(img, mask, json_dir, img_dir):
             mask_i = mask[i]
             mask_i = mask_i == cat
             bbox = {
-                "category_id": int(cat),
                 "bbox": [
                     int(np.min(np.where(mask_i)[1])),  # x
                     int(np.min(np.where(mask_i)[0])),  # y
@@ -87,7 +95,7 @@ def prep_and_save(img, mask, json_dir, img_dir):
             "conversations": [
                 {
                     "from": "human",
-                    "value": 'What are the objects and their bounding boxes in the image? Output in json format: [{"category_id": 1, "bbox": [x_min, y_min, width, height]}, {"category_id": 2, "bbox": [x_min, y_min, width, height]}, ...]',
+                    "value": 'What are the objects and their bounding boxes in the image? Output in json format: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
                 },
                 {"from": "gpt", "value": json.dumps(answer)},
             ],

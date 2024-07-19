@@ -1179,7 +1179,7 @@ def compute_metrics(evaluation_results, image_processor, tokenizer, threshold=0.
             }
         )
 
-    metric = MeanAveragePrecision(iou_type="bbox")
+    metric = MeanAveragePrecision(iou_type="bbox", box_format="xywh")
     metric.update(preds, y_boxes)
     metrics = metric.compute()
 
