@@ -22,12 +22,14 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --group_by_modality_length True \
     --bf16 True \
     --output_dir ~/LLaVA/llava/checkpoints/llava-2-7b-chat-task-qlora \
-    --num_train_epochs 5 \
+    --num_train_epochs 1 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \
-    --evaluation_strategy "epoch" \
-    --save_strategy "epoch" \
+    --evaluation_strategy "steps" \
+    --eval_steps 10 \
+    --save_strategy "steps" \
+    --save_steps 100 \
     --save_total_limit 1 \
     --learning_rate 2e-4 \
     --weight_decay 0. \

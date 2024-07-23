@@ -12,6 +12,7 @@ from PIL import Image
 import h5py
 import numpy as np
 import os
+from tqdm import tqdm
 
 
 def save_dataset(output_dir, train_size, val_size, test_size):
@@ -20,11 +21,10 @@ def save_dataset(output_dir, train_size, val_size, test_size):
         mask = f["mask"]
 
         # get train_size number of images for training with single object
-        i = 0
-        train_img, train_mask, i = get_split(train_size, img, mask, i)
-
-        val_img, val_mask, i = get_split(val_size, img, mask, i)
-        test_img, test_mask, i = get_split(test_size, img, mask, i)
+        # i = 0
+        # train_img, train_mask, i = get_split(train_size, img, mask, i)
+        # val_img, val_mask, i = get_split(val_size, img, mask, i)
+        # test_img, test_mask, i = get_split(test_size, img, mask, i)
 
         img_dir = f"{output_dir}/images"
         if not os.path.exists(img_dir):
@@ -39,39 +39,42 @@ def save_dataset(output_dir, train_size, val_size, test_size):
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
-        prep_and_save(train_img, train_mask, train_dir, img_dir)
-        prep_and_save(val_img, val_mask, val_dir, img_dir)
-        prep_and_save(test_img, test_mask, test_dir, img_dir)
+        prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
+        prep_and_save(img, mask, val_dir, img_dir, val_size, val_size)
+        prep_and_save(img, mask, test_dir, img_dir, test_size, train_size + val_size)
+
 
 def get_split(train_size, img, mask, i):
-    img_split = []
-    mask_split = []
-    for _ in range(train_size):
-        while True:
-            if len(np.unique(mask[i])) == 3:
-                img_split.append(img[i])
-                mask_split.append(mask[i])
-                i += 1
-                break
-            i += 1
-    img_split = np.array(img_split)
-    mask_split = np.array(mask_split)
+    # img_split = []
+    # mask_split = []
+    # for _ in range(train_size):
+    #     while True:
+    #         if len(np.unique(mask[i])) == 3:
+    #             img_split.append(img[i])
+    #             mask_split.append(mask[i])
+    #             i += 1
+    #             break
+    #         i += 1
+    img_split = img[i : i + train_size]
+    mask_split = mask[i : i + train_size]
     return img_split, mask_split, i
 
 
-def prep_and_save(img, mask, json_dir, img_dir):
+def prep_and_save(img, mask, json_dir, img_dir, size, start):
     json_data_list = []
-    for i in range(img.shape[0]):
-        unique_id = str(uuid.uuid4())
-        img_name = unique_id + ".jpg"
-        img_path = os.path.join(img_dir, img_name)
 
-        img_i = img[i]
-        img_i = img_i.astype(np.uint8)
-        img_i = Image.fromarray(img_i)
-        img_i.save(img_path)
+    for i in tqdm(range(start, start + size), desc=json_dir):
+        # unique_id = str(uuid.uuid4())
+        # img_name = unique_id + ".jpg"
+        # img_path = os.path.join(img_dir, img_name)
 
-        answer = []
+        # img_i = img[i]
+        # img_i = img_i.astype(np.uint8)
+        # img_i = Image.fromarray(img_i)
+        # img_i.save(img_path)
+        img_name = f"{i}.jpg"
+
+        boxes = []
         for cat in np.unique(mask[i]):
             if cat == 0 or cat == 255:
                 continue
@@ -87,17 +90,20 @@ def prep_and_save(img, mask, json_dir, img_dir):
                     - int(np.min(np.where(mask_i)[0])),  # height
                 ],
             }
-            answer.append(bbox)
+            boxes.append(bbox)
+
+        # if not boxes:
+        #     continue
 
         json_data = {
-            "id": unique_id,
+            "id": i,
             "image": img_name,
             "conversations": [
                 {
                     "from": "human",
-                    "value": 'What are the objects and their bounding boxes in the image? Output in json format: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
+                    "value": 'You are given a 512x384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in json format, x_min and y_min is the coordinate of the top left corner of an object bounding box, width and height are the width and height of the bounding box: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
                 },
-                {"from": "gpt", "value": json.dumps(answer)},
+                {"from": "gpt", "value": json.dumps(boxes)},
             ],
         }
 

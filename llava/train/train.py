@@ -14,6 +14,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
+from fileinput import filename
 import functools
 import os
 import copy
@@ -22,12 +23,14 @@ import json
 import logging
 import pathlib
 from typing import Dict, Optional, Sequence, List
+import h5py
 
 import numpy as np
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 import torch
 
+from tqdm import tqdm
 import transformers
 import tokenizers
 
@@ -744,12 +747,16 @@ class LazySupervisedDataset(Dataset):
         data_args: DataArguments,
     ):
         super(LazySupervisedDataset, self).__init__()
-        list_data_dict = json.load(open(data_path, "r"))
+        self.data_path = data_path
+        list_data_dict = self.getDataDict()
 
         rank0_print("Formatting inputs...Skip in lazy mode")
         self.tokenizer = tokenizer
         self.list_data_dict = list_data_dict
         self.data_args = data_args
+
+    def getDataDict(self):
+        return json.load(open(self.data_path, "r"))
 
     def __len__(self):
         return len(self.list_data_dict)
@@ -776,6 +783,10 @@ class LazySupervisedDataset(Dataset):
             length_list.append(cur_len)
         return length_list
 
+    def getImage(self, fileName):
+        image_folder = self.data_args.image_folder
+        return Image.open(os.path.join(image_folder, fileName)).convert("RGB")
+
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         sources = self.list_data_dict[i]
         if isinstance(i, int):
@@ -783,9 +794,10 @@ class LazySupervisedDataset(Dataset):
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
         if "image" in sources[0]:
             image_file = self.list_data_dict[i]["image"]
-            image_folder = self.data_args.image_folder
+            # image_folder = self.data_args.image_folder
             processor = self.data_args.image_processor
-            image = Image.open(os.path.join(image_folder, image_file)).convert("RGB")
+            image = self.getImage(image_file)
+            # image = Image.open(os.path.join(image_folder, image_file)).convert("RGB")
             if self.data_args.image_aspect_ratio == "pad":
 
                 def expand2square(pil_img, background_color):
@@ -838,6 +850,62 @@ class LazySupervisedDataset(Dataset):
         return data_dict
 
 
+class H5Dataset(LazySupervisedDataset):
+    def __init__(self, h5_path, data_path, tokenizer, data_args, split="train"):
+        self.h5 = h5py.File(h5_path, "r")
+        self.split = split
+        super().__init__(data_path, tokenizer, data_args)
+
+    # def getDataDict(self):
+    #     json_data_list = []
+    #     mask = self.h5["mask"]
+    #     if self.split == "train":
+    #         i = 0
+    #         size = 62000
+    #     else:
+    #         i = 62000
+    #         size = 100
+        
+    #     for i in tqdm(range(i, i + size), desc=self.split):
+    #         boxes = []
+    #         for cat in np.unique(mask[i]):
+    #             if cat == 0 or cat == 255:
+    #                 continue
+    #             mask_i = mask[i]
+    #             mask_i = mask_i == cat
+    #             bbox = {
+    #                 "bbox": [
+    #                     int(np.min(np.where(mask_i)[1])),  # x
+    #                     int(np.min(np.where(mask_i)[0])),  # y
+    #                     int(np.max(np.where(mask_i)[1]))
+    #                     - int(np.min(np.where(mask_i)[1])),  # width
+    #                     int(np.max(np.where(mask_i)[0]))
+    #                     - int(np.min(np.where(mask_i)[0])),  # height
+    #                 ],
+    #             }
+    #             boxes.append(bbox)
+
+    #             json_data = {
+    #                 "id": i,
+    #                 "image": f'{i}.jpg',
+    #                 "conversations": [
+    #                     {
+    #                         "from": "human",
+    #                         "value": 'You are given a 512x384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in json format, x_min and y_min is the coordinate of the top left corner of an object bounding box, width and height are the width and height of the bounding box: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
+    #                     },
+    #                     {"from": "gpt", "value": json.dumps(boxes)},
+    #                 ],
+    #             }       
+
+    #     json_data_list.append(json_data)
+    #     return json_data_list
+
+    def getImage(self, fileName):
+        i = int(fileName.split(".")[0])
+        return Image.fromarray(self.h5["data"][i])
+
+
+
 @dataclass
 class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
@@ -876,14 +944,26 @@ def make_supervised_data_module(
     tokenizer: transformers.PreTrainedTokenizer, data_args
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = LazySupervisedDataset(
-        tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args
-    )
-    eval_dataset = LazySupervisedDataset(
+    train_dataset = H5Dataset(
         tokenizer=tokenizer,
+        h5_path=os.path.expanduser('~/LLaVA/armbench512x384_5_all.h5'),
+        data_path=data_args.data_path,
+        data_args=data_args,
+    )
+    # train_dataset = LazySupervisedDataset(
+    #     tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args
+    # )
+    eval_dataset = H5Dataset(
+        tokenizer=tokenizer,
+        h5_path=os.path.expanduser('~/LLaVA/armbench512x384_5_all.h5'),
         data_path=data_args.validation_data_path,
         data_args=data_args,
     )
+    # eval_dataset = LazySupervisedDataset(
+    #     tokenizer=tokenizer,
+    #     data_path=data_args.validation_data_path,
+    #     data_args=data_args,
+    # )
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(
         train_dataset=train_dataset,
