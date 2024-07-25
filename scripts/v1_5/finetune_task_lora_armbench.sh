@@ -10,7 +10,6 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --model_name_or_path liuhaotian/llava-v1.5-7b \
     --version v1 \
     --data_path ~/LLaVA/armbench/train/dataset.json \
-    --validation_data_path ~/LLaVA/armbench/validation/dataset.json \
     --image_folder ~/LLaVA/armbench/images/ \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
@@ -25,8 +24,7 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \
-    --evaluation_strategy "steps" \
-    --eval_steps 10 \
+    --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 10 \
     --save_total_limit 1 \
