@@ -40,7 +40,7 @@ def save_dataset(output_dir, train_size, val_size, test_size):
             os.makedirs(test_dir)
 
         prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
-        prep_and_save(img, mask, val_dir, img_dir, val_size, val_size)
+        prep_and_save(img, mask, val_dir, img_dir, val_size, train_size)
         prep_and_save(img, mask, test_dir, img_dir, test_size, train_size + val_size)
 
 
@@ -65,13 +65,13 @@ def prep_and_save(img, mask, json_dir, img_dir, size, start):
 
     for i in tqdm(range(start, start + size), desc=json_dir):
         # unique_id = str(uuid.uuid4())
-        # img_name = unique_id + ".jpg"
-        # img_path = os.path.join(img_dir, img_name)
+        img_name = f"{i}.jpg"
+        img_path = os.path.join(img_dir, img_name)
 
-        # img_i = img[i]
-        # img_i = img_i.astype(np.uint8)
-        # img_i = Image.fromarray(img_i)
-        # img_i.save(img_path)
+        img_i = img[i]
+        img_i = img_i.astype(np.uint8)
+        img_i = Image.fromarray(img_i)
+        img_i.save(img_path)
         img_name = f"{i}.jpg"
 
         boxes = []
@@ -80,20 +80,18 @@ def prep_and_save(img, mask, json_dir, img_dir, size, start):
                 continue
             mask_i = mask[i]
             mask_i = mask_i == cat
-            bbox = {
-                "bbox": [
-                    int(np.min(np.where(mask_i)[1])),  # x
-                    int(np.min(np.where(mask_i)[0])),  # y
-                    int(np.max(np.where(mask_i)[1]))
-                    - int(np.min(np.where(mask_i)[1])),  # width
-                    int(np.max(np.where(mask_i)[0]))
-                    - int(np.min(np.where(mask_i)[0])),  # height
-                ],
-            }
+            bbox = [
+                int(np.min(np.where(mask_i)[1])),  # x
+                int(np.min(np.where(mask_i)[0])),  # y
+                int(np.max(np.where(mask_i)[1]))
+                - int(np.min(np.where(mask_i)[1])),  # width
+                int(np.max(np.where(mask_i)[0]))
+                - int(np.min(np.where(mask_i)[0])),  # height
+            ]
             boxes.append(bbox)
 
-        # if not boxes:
-        #     continue
+        if not boxes:
+            continue
 
         json_data = {
             "id": i,
@@ -101,7 +99,7 @@ def prep_and_save(img, mask, json_dir, img_dir, size, start):
             "conversations": [
                 {
                     "from": "human",
-                    "value": 'You are given a 512x384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in json format, x_min and y_min is the coordinate of the top left corner of an object bounding box, width and height are the width and height of the bounding box: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
+                    "value": 'You are given a 512 by 384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in the following format: [[x_min, y_min, width, height], [x_min, y_min, width, height], ...] \n\nx_min and y_min are placeholder for the coordinate of the top left corner of an object bounding box, width and height are placeholder for the width and height of the bounding box.',
                 },
                 {"from": "gpt", "value": json.dumps(boxes)},
             ],

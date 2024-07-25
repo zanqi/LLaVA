@@ -26,7 +26,7 @@ checkpoints
 ckpts*
 
 .ipynb_checkpoints
-*.ipynb
+# *.ipynb
 
 # DevContainer
 !.devcontainer/*
@@ -38,3 +38,4 @@ serve_images/
 dataset/
 armbench/
 armbench512x384_5_all.h5
+offload/

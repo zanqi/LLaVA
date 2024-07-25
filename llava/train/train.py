@@ -26,12 +26,14 @@ from typing import Dict, Optional, Sequence, List
 import h5py
 
 import numpy as np
+import pandas as pd
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 import torch
 
 from tqdm import tqdm
 import transformers
+from transformers.integrations import WandbCallback
 import tokenizers
 
 from llava.constants import (
@@ -737,6 +739,75 @@ def preprocess(
     return dict(input_ids=input_ids, labels=targets)
 
 
+class JsonDataDict:
+    def __init__(self, data_path):
+        self.data_path = data_path
+        self.data_dict = json.load(open(self.data_path, "r"))
+
+    def __len__(self):
+        return len(self.data_dict)
+
+    def __getitem__(self, i):
+        return self.data_dict[i]
+
+    def __iter__(self):
+        return iter(self.data_dict)
+
+
+# class H5DataDict:
+#     def __init__(self, h5, split="train"):
+#         self.h5 = h5
+#         self.split = split
+#         self.train_size = 62000
+#         self.test_size = 100
+
+#     def __len__(self):
+#         if self.split == "train":
+#             return self.train_size
+#         else:
+#             return self.test_size
+
+#     @functools.cache
+#     def __getitem__(self, i):
+#         if self.split == "train":
+#             i += 0
+#         else:
+#             i += self.train_size
+#         boxes = []
+#         for cat in np.unique(self.h5["mask"][i]):
+#             if cat == 0 or cat == 255:
+#                 continue
+#             mask_i = self.h5["mask"][i]
+#             mask_i = mask_i == cat
+#             bbox = {
+#                 "bbox": [
+#                     int(np.min(np.where(mask_i)[1])),  # x
+#                     int(np.min(np.where(mask_i)[0])),  # y
+#                     int(np.max(np.where(mask_i)[1]))
+#                     - int(np.min(np.where(mask_i)[1])),  # width
+#                     int(np.max(np.where(mask_i)[0]))
+#                     - int(np.min(np.where(mask_i)[0])),  # height
+#                 ],
+#             }
+#             boxes.append(bbox)
+
+#         return {
+#             "id": i,
+#             "image": f"{i}.jpg",
+#             "conversations": [
+#                 {
+#                     "from": "human",
+#                     "value": 'You are given a 512 by 384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in json format, x_min and y_min are placeholder for the coordinate of the top left corner of an object bounding box, width and height are placeholder for the width and height of the bounding box: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
+#                 },
+#                 {"from": "gpt", "value": json.dumps(boxes)},
+#             ],
+#         }
+
+#     def __iter__(self):
+#         for i in tqdm(range(len(self)), desc=self.split):
+#             yield self[i]
+
+
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -756,7 +827,7 @@ class LazySupervisedDataset(Dataset):
         self.data_args = data_args
 
     def getDataDict(self):
-        return json.load(open(self.data_path, "r"))
+        return JsonDataDict(self.data_path)
 
     def __len__(self):
         return len(self.list_data_dict)
@@ -857,53 +928,11 @@ class H5Dataset(LazySupervisedDataset):
         super().__init__(data_path, tokenizer, data_args)
 
     # def getDataDict(self):
-    #     json_data_list = []
-    #     mask = self.h5["mask"]
-    #     if self.split == "train":
-    #         i = 0
-    #         size = 62000
-    #     else:
-    #         i = 62000
-    #         size = 100
-        
-    #     for i in tqdm(range(i, i + size), desc=self.split):
-    #         boxes = []
-    #         for cat in np.unique(mask[i]):
-    #             if cat == 0 or cat == 255:
-    #                 continue
-    #             mask_i = mask[i]
-    #             mask_i = mask_i == cat
-    #             bbox = {
-    #                 "bbox": [
-    #                     int(np.min(np.where(mask_i)[1])),  # x
-    #                     int(np.min(np.where(mask_i)[0])),  # y
-    #                     int(np.max(np.where(mask_i)[1]))
-    #                     - int(np.min(np.where(mask_i)[1])),  # width
-    #                     int(np.max(np.where(mask_i)[0]))
-    #                     - int(np.min(np.where(mask_i)[0])),  # height
-    #                 ],
-    #             }
-    #             boxes.append(bbox)
-
-    #             json_data = {
-    #                 "id": i,
-    #                 "image": f'{i}.jpg',
-    #                 "conversations": [
-    #                     {
-    #                         "from": "human",
-    #                         "value": 'You are given a 512x384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in json format, x_min and y_min is the coordinate of the top left corner of an object bounding box, width and height are the width and height of the bounding box: [{"bbox": [x_min, y_min, width, height]}, {"bbox": [x_min, y_min, width, height]}, ...]',
-    #                     },
-    #                     {"from": "gpt", "value": json.dumps(boxes)},
-    #                 ],
-    #             }       
-
-    #     json_data_list.append(json_data)
-    #     return json_data_list
+    #     return H5DataDict(self.h5, self.split)
 
     def getImage(self, fileName):
         i = int(fileName.split(".")[0])
         return Image.fromarray(self.h5["data"][i])
-
 
 
 @dataclass
@@ -946,7 +975,7 @@ def make_supervised_data_module(
     """Make dataset and collator for supervised fine-tuning."""
     train_dataset = H5Dataset(
         tokenizer=tokenizer,
-        h5_path=os.path.expanduser('~/LLaVA/armbench512x384_5_all.h5'),
+        h5_path=os.path.expanduser("~/LLaVA/armbench512x384_5_all.h5"),
         data_path=data_args.data_path,
         data_args=data_args,
     )
@@ -955,7 +984,7 @@ def make_supervised_data_module(
     # )
     eval_dataset = H5Dataset(
         tokenizer=tokenizer,
-        h5_path=os.path.expanduser('~/LLaVA/armbench512x384_5_all.h5'),
+        h5_path=os.path.expanduser("~/LLaVA/armbench512x384_5_all.h5"),
         data_path=data_args.validation_data_path,
         data_args=data_args,
     )
@@ -970,6 +999,62 @@ def make_supervised_data_module(
         eval_dataset=eval_dataset,
         data_collator=data_collator,
     )
+
+
+def decode_predictions(tokenizer, predictions):
+    # replace -100 with pad_token_id
+    label_ids = [
+        [(x if x != -100 else tokenizer.pad_token_id) for x in example]
+        for example in predictions.label_ids
+    ]
+    labels = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
+    logits = predictions.predictions.argmax(axis=-1)
+    # replace position where label_ids is -100 with pad_token_id
+    logits = np.where(predictions.label_ids == -100, tokenizer.pad_token_id, logits)
+
+    # logits = [
+    #     (logits[i] if predictions.label_ids[i] != -100 else tokenizer.pad_token_id)
+    #     for i in range(len(logits))
+    # ]
+
+    prediction_text = tokenizer.batch_decode(logits, skip_special_tokens=True)
+    return {"labels": labels, "predictions": prediction_text}
+
+
+class WandbPredictionProgressCallback(WandbCallback):
+    def __init__(self, trainer, tokenizer, val_dataset, num_samples=100, freq=2):
+        """Initializes the WandbPredictionProgressCallback instance.
+
+        Args:
+            trainer (Trainer): The Hugging Face Trainer instance.
+            tokenizer (AutoTokenizer): The tokenizer associated
+              with the model.
+            val_dataset (Dataset): The validation dataset.
+            num_samples (int, optional): Number of samples to select from
+              the validation dataset for generating predictions.
+              Defaults to 100.
+            freq (int, optional): Frequency of logging. Defaults to 2.
+        """
+        super().__init__()
+        self.trainer = trainer
+        self.tokenizer = tokenizer
+        self.sample_dataset = val_dataset
+        self.freq = freq
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        super().on_evaluate(args, state, control, **kwargs)
+        # control the frequency of logging by logging the predictions
+        # every `freq` epochs
+        # generate predictions
+        predictions = self.trainer.predict(self.sample_dataset)
+        # decode predictions and labels
+        predictions = decode_predictions(self.tokenizer, predictions)
+        # add predictions to a wandb.Table
+        predictions_df = pd.DataFrame(predictions)
+        predictions_df["epoch"] = state.epoch
+        records_table = self._wandb.Table(dataframe=predictions_df)
+        # log the table to wandb
+        self._wandb.log({"sample_predictions": records_table})
 
 
 def train(attn_implementation=None):
@@ -1188,6 +1273,11 @@ def train(attn_implementation=None):
         **data_module,
     )
 
+    evals_callback = WandbPredictionProgressCallback(
+        trainer, tokenizer, data_module["eval_dataset"]
+    )
+    trainer.add_callback(evals_callback)
+
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
     else:
@@ -1232,6 +1322,9 @@ def compute_metrics(evaluation_results, image_processor, tokenizer, threshold=0.
 
     logits, labels = evaluation_results.predictions, evaluation_results.label_ids
     predictions = np.argmax(logits, axis=-1)
+
+    # replace predictions with pad_token_id where the labels are -100
+    predictions = np.where(labels == -100, tokenizer.pad_token_id, predictions)
     predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     preds = []
     for pred in predictions:
@@ -1241,7 +1334,7 @@ def compute_metrics(evaluation_results, image_processor, tokenizer, threshold=0.
             pred = []
         preds.append(
             {
-                "boxes": torch.tensor([e["bbox"] for e in pred]).to(device="cuda"),
+                "boxes": torch.tensor(pred).to(device="cuda"),
                 "labels": torch.zeros(len(pred)).int().to(device="cuda"),
                 "scores": torch.ones(len(pred)).to(device="cuda"),
             }
@@ -1262,6 +1355,12 @@ def compute_metrics(evaluation_results, image_processor, tokenizer, threshold=0.
     metric = MeanAveragePrecision(iou_type="bbox", box_format="xywh")
     metric.update(preds, y_boxes)
     metrics = metric.compute()
+
+    print("generated:", predictions[:2])
+    print("preds: ", preds[:2])
+    print("targets: ", y_boxes[:2])
+    print("metrics: ", metrics)
+    raise ValueError("test")
 
     return metrics
 

@@ -27,7 +27,7 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "steps" \
-    --eval_steps 10 \
+    --eval_steps 100 \
     --save_strategy "steps" \
     --save_steps 100 \
     --save_total_limit 1 \
