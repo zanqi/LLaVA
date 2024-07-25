@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Set the prompt and model versions directly in the command
 deepspeed ~/LLaVA/llava/train/train_mem.py \
     --deepspeed ~/LLaVA/scripts/zero2.json \
     --lora_enable True \
@@ -8,8 +7,8 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --lora_alpha 256 \
     --mm_projector_lr 2e-5 \
     --bits 4 \
-    --model_name_or_path ~/LLaVA/llava-v1.5-7b \
-    --version llava_llama_2 \
+    --model_name_or_path liuhaotian/llava-v1.5-7b \
+    --version v1 \
     --data_path ~/LLaVA/armbench/train/dataset.json \
     --validation_data_path ~/LLaVA/armbench/validation/dataset.json \
     --image_folder ~/LLaVA/armbench/images/ \
@@ -21,15 +20,15 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 True \
-    --output_dir ~/LLaVA/llava/checkpoints/llava-2-7b-chat-task-qlora \
+    --output_dir ~/LLaVA/llava/checkpoints/llava-v1.5-7b-task-lora \
     --num_train_epochs 1 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "steps" \
-    --eval_steps 100 \
+    --eval_steps 10 \
     --save_strategy "steps" \
-    --save_steps 100 \
+    --save_steps 10 \
     --save_total_limit 1 \
     --learning_rate 2e-4 \
     --weight_decay 0. \

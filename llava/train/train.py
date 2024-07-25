@@ -1262,21 +1262,21 @@ def train(attn_implementation=None):
                         module = module.to(torch.bfloat16)
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
-    eval_compute_metrics_fn = functools.partial(
-        compute_metrics, image_processor=None, tokenizer=tokenizer
-    )
+    # eval_compute_metrics_fn = functools.partial(
+    #     compute_metrics, image_processor=None, tokenizer=tokenizer
+    # )
     trainer = LLaVATrainer(
         model=model,
         tokenizer=tokenizer,
         args=training_args,
-        compute_metrics=eval_compute_metrics_fn,
+        # compute_metrics=eval_compute_metrics_fn,
         **data_module,
     )
 
-    evals_callback = WandbPredictionProgressCallback(
-        trainer, tokenizer, data_module["eval_dataset"]
-    )
-    trainer.add_callback(evals_callback)
+    # evals_callback = WandbPredictionProgressCallback(
+    #     trainer, tokenizer, data_module["eval_dataset"]
+    # )
+    # trainer.add_callback(evals_callback)
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
@@ -1306,63 +1306,62 @@ def train(attn_implementation=None):
         )
 
 
-@torch.no_grad()
-def compute_metrics(evaluation_results, image_processor, tokenizer, threshold=0.0):
-    """
-    Compute mean average mAP, mAR and their variants for the object detection task.
+# @torch.no_grad()
+# def compute_metrics(evaluation_results, image_processor, tokenizer, threshold=0.0):
+#     """
+#     Compute mean average mAP, mAR and their variants for the object detection task.
 
-    Args:
+#     Args:
 
-        evaluation_results (EvalPrediction): Predictions and targets from evaluation.
-        threshold (float, optional): Threshold to filter predicted boxes by confidence. Defaults to 0.0.
-        id2label (Optional[dict], optional): Mapping from class id to class name. Defaults to None.
-    Returns:
-        Mapping[str, float]: Metrics in a form of dictionary {<metric_name>: <metric_value>}
-    """
+#         evaluation_results (EvalPrediction): Predictions and targets from evaluation.
+#         threshold (float, optional): Threshold to filter predicted boxes by confidence. Defaults to 0.0.
+#         id2label (Optional[dict], optional): Mapping from class id to class name. Defaults to None.
+#     Returns:
+#         Mapping[str, float]: Metrics in a form of dictionary {<metric_name>: <metric_value>}
+#     """
 
-    logits, labels = evaluation_results.predictions, evaluation_results.label_ids
-    predictions = np.argmax(logits, axis=-1)
+#     logits, labels = evaluation_results.predictions, evaluation_results.label_ids
+#     predictions = np.argmax(logits, axis=-1)
 
-    # replace predictions with pad_token_id where the labels are -100
-    predictions = np.where(labels == -100, tokenizer.pad_token_id, predictions)
-    predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    preds = []
-    for pred in predictions:
-        try:
-            pred = json.loads(pred)
-        except ValueError:
-            pred = []
-        preds.append(
-            {
-                "boxes": torch.tensor(pred).to(device="cuda"),
-                "labels": torch.zeros(len(pred)).int().to(device="cuda"),
-                "scores": torch.ones(len(pred)).to(device="cuda"),
-            }
-        )
-    # replace -100 with padding index
-    labels = np.where(labels == -100, tokenizer.pad_token_id, labels)
-    labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-    labels = [json.loads(t) for t in labels]
-    y_boxes = []
-    for target in labels:
-        y_boxes.append(
-            {
-                "boxes": torch.tensor([e["bbox"] for e in target]).to(device="cuda"),
-                "labels": torch.zeros(len(target)).int().to(device="cuda"),
-            }
-        )
+#     # replace predictions with pad_token_id where the labels are -100
+#     predictions = np.where(labels == -100, tokenizer.pad_token_id, predictions)
+#     predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+#     preds = []
+#     for pred in predictions:
+#         try:
+#             pred = json.loads(pred)
+#         except ValueError:
+#             pred = []
+#         preds.append(
+#             {
+#                 "boxes": torch.tensor(pred).to(device="cuda"),
+#                 "labels": torch.zeros(len(pred)).int().to(device="cuda"),
+#                 "scores": torch.ones(len(pred)).to(device="cuda"),
+#             }
+#         )
+#     # replace -100 with padding index
+#     labels = np.where(labels == -100, tokenizer.pad_token_id, labels)
+#     labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+#     labels = [json.loads(t) for t in labels]
+#     y_boxes = []
+#     for target in labels:
+#         y_boxes.append(
+#             {
+#                 "boxes": torch.tensor(target).to(device="cuda"),
+#                 "labels": torch.zeros(len(target)).int().to(device="cuda"),
+#             }
+#         )
 
-    metric = MeanAveragePrecision(iou_type="bbox", box_format="xywh")
-    metric.update(preds, y_boxes)
-    metrics = metric.compute()
+#     metric = MeanAveragePrecision(iou_type="bbox", box_format="xywh")
+#     metric.update(preds, y_boxes)
+#     metrics = metric.compute()
 
-    print("generated:", predictions[:2])
-    print("preds: ", preds[:2])
-    print("targets: ", y_boxes[:2])
-    print("metrics: ", metrics)
-    raise ValueError("test")
+#     print("generated:", predictions[:2])
+#     print("preds: ", preds[:2])
+#     print("targets: ", y_boxes[:2])
+#     print("metrics: ", metrics)
 
-    return metrics
+#     return metrics
 
 
 if __name__ == "__main__":
