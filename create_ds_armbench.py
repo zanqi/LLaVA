@@ -81,14 +81,17 @@ def prep_and_save(img, mask, json_dir, img_dir, size, start):
             mask_i = mask[i]
             mask_i = mask_i == cat
             bbox = [
-                int(np.min(np.where(mask_i)[1])),  # x
-                int(np.min(np.where(mask_i)[0])),  # y
+                int(np.min(np.where(mask_i)[1])),  # x_min
+                int(np.min(np.where(mask_i)[0])),  # y_min
                 int(np.max(np.where(mask_i)[1]))
                 - int(np.min(np.where(mask_i)[1])),  # width
                 int(np.max(np.where(mask_i)[0]))
                 - int(np.min(np.where(mask_i)[0])),  # height
             ]
-            boxes.append(bbox)
+            bbox = bbox / np.array([512, 384, 512, 384])
+            # round to 2 decimal places
+            bbox = np.round(bbox, 2)
+            boxes.append(bbox.tolist())
 
         if not boxes:
             continue
@@ -99,7 +102,7 @@ def prep_and_save(img, mask, json_dir, img_dir, size, start):
             "conversations": [
                 {
                     "from": "human",
-                    "value": 'You are given a 512 by 384 image. Perform object detection on it. What are the objects and their bounding boxes in the image? Output in the following format: [[x_min, y_min, width, height], [x_min, y_min, width, height], ...] \n\nx_min and y_min are placeholder for the coordinate of the top left corner of an object bounding box, width and height are placeholder for the width and height of the bounding box.',
+                    "value": "Perform object detection on the given image. First, resize the image to 1x1, then answer: what are the bounding boxes of the objects in the image? Output should be in  the format of a list of lists, where each list represents a bounding box: [[x_min, y_min, width, height], [x_min, y_min, width, height], ...] \n\nx_min and y_min are placeholder for the coordinate of the top left corner of an object bounding box, width and height are placeholder for the width and height of the bounding box. \n\nThe x_min, y_min, width and height of the bounding box should be positive decimal numbers between 0 and 1. \n\n \n\nFor example, if there are two objects in the image, the bounding boxes of the objects could be [[0.13, 0.24, 0.37, 0.4], [0.5, 0.55, 0.23, 0.25]].",
                 },
                 {"from": "gpt", "value": json.dumps(boxes)},
             ],
