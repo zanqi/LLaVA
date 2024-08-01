@@ -47,14 +47,15 @@ def load_images(image_files):
     return out
 
 
-def eval_model(args):
+def eval_model(args, model=None, tokenizer=None, image_processor=None):
     # Model
     disable_torch_init()
 
     model_name = get_model_name_from_path(args.model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(
-        args.model_path, args.model_base, model_name
-    )
+    if model is None:
+        tokenizer, model, image_processor, context_len = load_pretrained_model(
+            args.model_path, args.model_base, model_name
+        )
     model.eval()
 
     qs = args.query
@@ -127,6 +128,7 @@ def eval_model(args):
 
     outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
     print(outputs)
+    return outputs
 
 
 if __name__ == "__main__":

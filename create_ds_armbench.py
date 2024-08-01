@@ -15,8 +15,8 @@ import os
 from tqdm import tqdm
 
 
-def save_dataset(output_dir, train_size, val_size, test_size):
-    with h5py.File("armbench512x384_5_all.h5", "r") as f:
+def save_dataset(h5_path, output_dir, train_size, val_size, test_size):
+    with h5py.File(h5_path) as f:
         img = f["data"]
         mask = f["mask"]
 
@@ -39,40 +39,22 @@ def save_dataset(output_dir, train_size, val_size, test_size):
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
-        prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
+        # prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
         prep_and_save(img, mask, val_dir, img_dir, val_size, train_size)
         prep_and_save(img, mask, test_dir, img_dir, test_size, train_size + val_size)
 
-
-def get_split(train_size, img, mask, i):
-    # img_split = []
-    # mask_split = []
-    # for _ in range(train_size):
-    #     while True:
-    #         if len(np.unique(mask[i])) == 3:
-    #             img_split.append(img[i])
-    #             mask_split.append(mask[i])
-    #             i += 1
-    #             break
-    #         i += 1
-    img_split = img[i : i + train_size]
-    mask_split = mask[i : i + train_size]
-    return img_split, mask_split, i
 
 
 def prep_and_save(img, mask, json_dir, img_dir, size, start):
     json_data_list = []
 
     for i in tqdm(range(start, start + size), desc=json_dir):
-        # unique_id = str(uuid.uuid4())
         img_name = f"{i}.jpg"
         img_path = os.path.join(img_dir, img_name)
-
         img_i = img[i]
         img_i = img_i.astype(np.uint8)
         img_i = Image.fromarray(img_i)
         img_i.save(img_path)
-        img_name = f"{i}.jpg"
 
         boxes = []
         for cat in np.unique(mask[i]):
@@ -120,6 +102,13 @@ def main(arguments):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
+        "--h5",
+        type=str,
+        help="h5 file containing the dataset",
+        default="/gscratch/sciencehub/sebgab/Dev/data/armbench512x384_5_all.h5",
+        required=False,
+    )
+    parser.add_argument(
         "--output_dir",
         type=str,
         help="Directory to save the dataset in",
@@ -130,29 +119,30 @@ def main(arguments):
         "--train_size",
         type=int,
         help="Number of training samples",
-        default=10,
+        default=60000,
         required=False,
     )
     parser.add_argument(
         "--val_size",
         type=int,
         help="Number of validation samples",
-        default=5,
+        default=100,
         required=False,
     )
     parser.add_argument(
         "--test_size",
         type=int,
         help="Number of test samples",
-        default=5,
+        default=100,
         required=False,
     )
     args = parser.parse_args(arguments)
+    h5_path = args.h5
     output_dir = args.output_dir
     train_size = args.train_size
     val_size = args.val_size
     test_size = args.test_size
-    save_dataset(output_dir, train_size, val_size, test_size)
+    save_dataset(h5_path, output_dir, train_size, val_size, test_size)
 
 
 if __name__ == "__main__":
