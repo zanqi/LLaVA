@@ -8,7 +8,7 @@ deepspeed llava/train/train_mem.py \
     --mm_projector_lr 2e-5 \
     --model_name_or_path liuhaotian/llava-v1.5-7b \
     --version v1 \
-    --data_path armbench/train/dataset.json \
+    --data_path armbench/train/dataset100.json \
     --validation_data_path armbench/validation/dataset.json \
     --image_folder armbench/images/ \
     --vision_tower openai/clip-vit-large-patch14-336 \
@@ -16,10 +16,11 @@ deepspeed llava/train/train_mem.py \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
+    --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 True \
     --output_dir llava/checkpoints/llava-v1.5-7b-task-lora \
-    --num_train_epochs 1 \
+    --num_train_epochs 100 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \

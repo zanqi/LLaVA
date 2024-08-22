@@ -11,7 +11,8 @@ from tqdm import tqdm
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output-file', type=str, default="predictions/llava-v1.5-7b-task-lora.json")
+    parser.add_argument('--input-file', type=str, default="armbench/train/dataset100.json")
+    parser.add_argument('--output-file', type=str, default="predictions/llava-v1.5-7b-task-lora-100e.json")
     parser.add_argument('--split', type=str, default='test')
     return parser.parse_args()
 
@@ -26,9 +27,9 @@ if __name__ == "__main__":
         model_name=get_model_name_from_path(model_path)
     )
 
-    prompt = "Perform object detection on the given image. First, resize the image to 1x1, then answer: what are the bounding boxes of the  objects in the image? Output should be in  the format of a list of lists, where each list represents a bounding box: [[x_min, y_min,     width, height], [x_min, y_min, width, height], ...] \n\nx_min and y_min are placeholder for the coordinate of the top left corner of    an object bounding box, width and height are placeholder for the width and height of the bounding box. \n\nThe x_min, y_min, width     and height of the bounding box should be positive decimal numbers between 0 and 1. \n\n \n\nFor example, if there are two objects in    the image, the bounding boxes of the objects could be [[0.13, 0.24, 0.37, 0.4], [0.5, 0.55, 0.23, 0.25]]."
+    prompt = "Perform object detection on the given image. First, resize the image to 1x1, then answer: what are the bounding boxes of the  objects in the image? Output should be in the format of a list of lists, where each list represents a bounding box: [[x_min, y_min, width, height], [x_min, y_min, width, height], ...] \n\nx_min and y_min are placeholder for the coordinate of the top left corner of an object bounding box, width and height are placeholder for the width and height of the bounding box. \n\nThe x_min, y_min, width and height of the bounding box should be positive decimal numbers between 0 and 1. \n\n \n\nFor example, if there are two objects in the image, the bounding boxes of the objects could be [[0.13, 0.24, 0.37, 0.4], [0.5, 0.55, 0.23, 0.25]]."
     image_folder = "armbench/images"
-    dataset_json = json.load(open("armbench/test/dataset.json", "r"))
+    dataset_json = json.load(open(args.input_file, "r"))
     image_files = [os.path.join(image_folder, x["image"]) for x in dataset_json]
 
     res = []

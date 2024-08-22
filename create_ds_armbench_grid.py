@@ -13,12 +13,15 @@ import h5py
 import numpy as np
 import os
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from string import ascii_lowercase
+import io
 
 
 def save_dataset(h5_path, output_dir, train_size, val_size, test_size):
     with h5py.File(h5_path) as f:
-        img = f["data"]
-        mask = f["mask"]
+        images = f["data"]
+        masks = f["mask"]
 
         # get train_size number of images for training with single object
         # i = 0
@@ -39,48 +42,116 @@ def save_dataset(h5_path, output_dir, train_size, val_size, test_size):
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
-        prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
-        prep_and_save(img, mask, val_dir, img_dir, val_size, train_size)
-        prep_and_save(img, mask, test_dir, img_dir, test_size, train_size + val_size)
+        prep_and_save(images, masks, train_dir, img_dir, train_size, 0)
+        prep_and_save(images, masks, val_dir, img_dir, val_size, train_size)
+        prep_and_save(images, masks, test_dir, img_dir, test_size, train_size + val_size)
 
 
+def annotate_grid(image, grid_size):
+    fig, ax = plt.subplots(1, 1)
+    ax.imshow(image)
+    ax.axis('off')
 
-def prep_and_save(img, mask, json_dir, img_dir, size, start):
+    image_size = image.size[:2]
+    (w, h) = image_size
+
+    for i in range(1, grid_size[0]):
+        ax.hlines(h * i / grid_size[0], 0, w,
+                  color='black', alpha=0.3, linewidth=1)
+
+    for j in range(1, grid_size[1]):
+        ax.vlines(w * j / grid_size[1], 0, h,
+                  color='black', alpha=0.3, linewidth=1)
+
+    # for i in range(0, grid_size[0]):
+    #     ax.annotate(str(i + 1),
+    #                 [w * (i + 0.5) / grid_size[0], 0],
+    #                 [w * (i + 0.5) / grid_size[0], -10],
+    #                 size=12)
+
+    # for i in range(0, grid_size[0]):
+    #     ax.annotate(ascii_lowercase[i],
+    #                 [0, h * (i + 0.5) / grid_size[0]],
+    #                 [-20, h * (i + 0.5) / grid_size[0]],
+    #                 size=12)
+
+    for i in range(0, grid_size[0]):
+        for j in range(0, grid_size[1]):
+            ax.annotate(str(f"{ascii_lowercase[i]}{grid_size[1] - j}"),
+                        [w * (i + 0.5) / grid_size[0], h *
+                         (j + 0.5) / grid_size[1]],
+                        [w * (i + 0.5) / grid_size[0], h *
+                         (j + 0.5) / grid_size[1]],
+                        size=10,
+                        color='white')
+
+    buf = io.BytesIO()
+    fig.savefig(buf, transparent=True, bbox_inches='tight',
+                pad_inches=0, format='jpg')
+    buf.seek(0)
+    # close the figure to prevent it from being displayed
+    plt.close(fig)
+    return Image.open(buf)
+
+def annotate_visual_prompts(
+        obs_image,
+        grid_size
+):
+    """Annotate the visual prompts on the image.
+    """
+    annotated_image = annotate_grid(
+        obs_image,
+        grid_size,
+    )
+    return annotated_image
+
+
+def annotate_images(img, id, img_dir):
+    img = img.resize([512, 512], Image.LANCZOS)
+    annotated_img = annotate_visual_prompts(
+        img,
+        grid_size=[5, 5])
+    file_name = f'{id}.jpg'
+    annotated_img.save(os.path.join(img_dir, file_name))
+
+
+def box2grid(bbox, x_grid_size, y_grid_size):
+    x_min, y_min, x_max, y_max = bbox
+    upper_left_tile_col = chr(x_min // x_grid_size + ord('a'))
+    upper_left_tile
+    return [x_center, y_center]
+
+
+def prep_and_save(images, masks, json_dir, img_dir, size, start):
     json_data_list = []
 
     for i in tqdm(range(start, start + size), desc=json_dir):
-        img_name = f"{i}.jpg"
-        img_path = os.path.join(img_dir, img_name)
-        img_i = img[i]
-        img_i = img_i.astype(np.uint8)
-        img_i = Image.fromarray(img_i)
-        img_i.save(img_path)
+        img = Image.fromarray(images[i].astype(np.uint8))
+        x_grid_size = img.size[0] // 5
+        y_grid_size = img.size[1] // 5
+        annotate_images(img, i, img_dir)
 
         boxes = []
-        for cat in np.unique(mask[i]):
+        for cat in np.unique(masks[i]):
             if cat == 0 or cat == 255:
                 continue
-            mask_i = mask[i]
+            mask_i = masks[i]
             mask_i = mask_i == cat
             bbox = [
                 int(np.min(np.where(mask_i)[1])),  # x_min
                 int(np.min(np.where(mask_i)[0])),  # y_min
-                int(np.max(np.where(mask_i)[1]))
-                - int(np.min(np.where(mask_i)[1])),  # width
-                int(np.max(np.where(mask_i)[0]))
-                - int(np.min(np.where(mask_i)[0])),  # height
+                int(np.max(np.where(mask_i)[1])),  # x_max
+                int(np.max(np.where(mask_i)[0])),  # y_max
             ]
-            bbox = bbox / np.array([512, 384, 512, 384])
-            # round to 2 decimal places
-            bbox = np.round(bbox, 2)
-            boxes.append(bbox.tolist())
+            grid = box2grid(bbox, x_grid_size, y_grid_size)
+            boxes.append(grid)
 
         if not boxes:
             continue
 
         json_data = {
             "id": i,
-            "image": img_name,
+            "image": f"{i}.jpg",
             "conversations": [
                 {
                     "from": "human",
@@ -112,14 +183,14 @@ def main(arguments):
         "--output_dir",
         type=str,
         help="Directory to save the dataset in",
-        default="armbench",
+        default="armbench_grid",
         required=False,
     )
     parser.add_argument(
         "--train_size",
         type=int,
         help="Number of training samples",
-        default=60000,
+        default=600,
         required=False,
     )
     parser.add_argument(

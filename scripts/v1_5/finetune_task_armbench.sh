@@ -1,12 +1,12 @@
 #!/bin/bash
 
-deepspeed ~/LLaVA/llava/train/train_mem.py \
-    --deepspeed ~/LLaVA/scripts/zero3.json \
+deepspeed llava/train/train_mem.py \
+    --deepspeed scripts/zero2.json \
     --model_name_or_path liuhaotian/llava-v1.5-7b \
     --version v1 \
-    --data_path ~/LLaVA/armbench/train/dataset.json \
-    --validation_data_path ~/LLaVA/armbench/validation/dataset.json \
-    --image_folder ~/LLaVA/armbench/images/ \
+    --data_path armbench/train/dataset100.json \
+    --validation_data_path armbench/validation/dataset.json \
+    --image_folder armbench/images/ \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
@@ -16,7 +16,7 @@ deepspeed ~/LLaVA/llava/train/train_mem.py \
     --group_by_modality_length True \
     --bf16 True \
     --output_dir ~/LLaVA/llava/checkpoints/llava-v1.5-7b-task \
-    --num_train_epochs 1 \
+    --num_train_epochs 10 \
     --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
