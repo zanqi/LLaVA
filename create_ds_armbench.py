@@ -39,7 +39,7 @@ def save_dataset(h5_path, output_dir, train_size, val_size, test_size):
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
-        # prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
+        prep_and_save(img, mask, train_dir, img_dir, train_size, 0)
         prep_and_save(img, mask, val_dir, img_dir, val_size, train_size)
         prep_and_save(img, mask, test_dir, img_dir, test_size, train_size + val_size)
 

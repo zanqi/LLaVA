@@ -874,7 +874,7 @@ class H5Dataset(LazySupervisedDataset):
 
     def getImage(self, fileName):
         i = int(fileName.split(".")[0])
-        return Image.fromarray(self.h5["data"][i])
+        return Image.fromarray(self.h5["data"][i], mode="RGB")
 
 
 @dataclass
@@ -915,26 +915,30 @@ def make_supervised_data_module(
     tokenizer: transformers.PreTrainedTokenizer, data_args
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = H5Dataset(
-        tokenizer=tokenizer,
-        h5_path=os.path.expanduser("/gscratch/sciencehub/sebgab/Dev/data/armbench512x384_5_all.h5"),
-        data_path=data_args.data_path,
-        data_args=data_args,
-    )
-    # train_dataset = LazySupervisedDataset(
-    #     tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args
-    # )
-    eval_dataset = H5Dataset(
-        tokenizer=tokenizer,
-        h5_path=os.path.expanduser("/gscratch/sciencehub/sebgab/Dev/data/armbench512x384_5_all.h5"),
-        data_path=data_args.validation_data_path,
-        data_args=data_args,
-    )
-    # eval_dataset = LazySupervisedDataset(
+    # train_dataset = H5Dataset(
     #     tokenizer=tokenizer,
+    #     h5_path=os.path.expanduser("/gscratch/sciencehub/sebgab/Dev/data/armbench512x384_5_all.h5"),
+    #     data_path=data_args.data_path,
+    #     data_args=data_args,
+    # )
+    train_dataset = LazySupervisedDataset(
+        tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args
+    )
+    # dump first image tensor
+    # json.dump(train_dataset[0]["image"].numpy().tolist(), open("first_image_jpg.json", "w"))
+    # print("first image", train_dataset[0]["image"])
+    # exit(0)
+    # eval_dataset = H5Dataset(
+    #     tokenizer=tokenizer,
+    #     h5_path=os.path.expanduser("/gscratch/sciencehub/sebgab/Dev/data/armbench512x384_5_all.h5"),
     #     data_path=data_args.validation_data_path,
     #     data_args=data_args,
     # )
+    eval_dataset = LazySupervisedDataset(
+        tokenizer=tokenizer,
+        data_path=data_args.validation_data_path,
+        data_args=data_args,
+    )
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(
         train_dataset=train_dataset,
